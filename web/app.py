@@ -3,14 +3,27 @@ from flask_restful import Api, Resource
 from pymongo import MongoClient
 import bcrypt
 
+# ------------------------------------------
+# summarization depecdancies
+from nltk.corpus import stopwords
+from nltk.tokenize import sent_tokenize,word_tokenize
+import heapq
+import nltk
+import re
+import os
+# ------------------------------------------
+
 app = Flask(__name__)
 api = Api(app)
+
+import spacy
+nlp = spacy.load('en_core_web_sm')
 
 client = MongoClient("mongodb://localhost:27017")
 db = client.SimilarityDB
 users = db["Users"]
 
-
+base_path=os.getcwd()
 
 def UserExist(username):
     # if users.find({"Username":username}).count() == 0:
@@ -38,7 +51,7 @@ class Register(Resource):
         hashed_pw = bcrypt.hashpw(password.encode('utf8'), bcrypt.gensalt())
 
         #Store username and pw into the database
-        users.insert({
+        users.insert_one({
             "Username": username,
             "Password": hashed_pw,
             "Tokens":6
@@ -68,6 +81,75 @@ def countTokens(username):
     })[0]["Tokens"]
     return tokens
 
+def summarize(text):
+    pass
+
+def summarize_text(filename,no_of_sentences,print_summarized_text=False):
+    # read the text file
+    path=base_path+"\\documents"+"\\"+filename
+    print(path)
+    if not os.path.exists(path):
+        retJson={"status":304,
+                 "msg":"File not found"}
+        return jsonify(retJson)
+    with open(path) as txt:
+        data=txt.read()
+    # sentence tokenization
+    sentences = sent_tokenize(data)
+    print('Total number of sentences in the text: {0}'.format(len(sentences)))
+    
+    # cleaning text
+    dict = {}
+    text=""
+    for a in sentences:
+        temp = re.sub("[^a-zA-Z]"," ",a)
+        temp = temp.lower()
+        dict[temp] = a
+        text+=temp
+        
+    # stop words removal
+    stopwords = nltk.corpus.stopwords.words('english')
+    word_fre = {}
+    for word in nltk.word_tokenize(text):
+        if word not in stopwords:
+            if word not in word_fre.keys():
+                word_fre[word] = 1
+            else:
+                word_fre[word] += 1
+                
+    max_freq = max(word_fre.values())
+    
+    # calculating word frequencies in the text
+    for w in word_fre :
+        word_fre[w]/=max_freq
+        
+    # calculating sentence scores based on word frequencies
+    sent_scores = {}
+    for sent in sentences:
+        for word in nltk.word_tokenize(sent.lower()):
+            if word in word_fre.keys():
+                if len(sent.split(' ')) < 30:
+                    if sent not in sent_scores.keys():
+                        sent_scores[sent] = word_fre[word]
+                    else:
+                        sent_scores[sent] += word_fre[word]
+                        
+    # summary generation using top 'n' sentences from sent_scores
+    summarized_sentences = heapq.nlargest(no_of_sentences, sent_scores, key=sent_scores.get)
+    summarized_text = ' '.join(summarized_sentences)
+    if print_summarized_text:
+        print('-'*80)
+        print('Original text is:')
+        print('-'*80)
+        print(data)
+        print('-'*80)
+        print('Summarized text is:')
+        print('-'*80)
+        print(summarized_text)
+        print('-'*80)
+    return data,summarized_text
+
+
 class Detect(Resource):
     def post(self):
         #Step 1 get the posted data
@@ -76,8 +158,10 @@ class Detect(Resource):
         #Step 2 is to read the data
         username = postedData["username"]
         password = postedData["password"]
-        text1 = postedData["text1"]
-        text2 = postedData["text2"]
+        path1 = postedData["path1"]
+        path1=base_path+"\\documents"+"\\"+path1
+        path2 = postedData["path2"]
+        path2=base_path+"\\documents"+"\\"+path2
 
         if not UserExist(username):
             retJson = {
@@ -104,8 +188,17 @@ class Detect(Resource):
             return jsonify(retJson)
 
         #Calculate edit distance between text1, text2
-        import spacy
-        nlp = spacy.load('en_core_web_sm')
+        try:
+            with open(path1) as file:
+                text1=file.read()
+            with open(path2) as file:
+                text2=file.read()
+            pass
+        except:
+            retJson={"status":304,
+                     "msg":"File not found"
+                     }
+            return retJson
         text1 = nlp(text1)
         text2 = nlp(text2)
 
@@ -119,7 +212,7 @@ class Detect(Resource):
 
         #Take away 1 token from user
         current_tokens = countTokens(username)
-        users.update({
+        users.update_one({
             "Username":username
         }, {
             "$set":{
@@ -153,7 +246,7 @@ class Refill(Resource):
             return jsonify(retJson)
 
         #MAKE THE USER PAY!
-        users.update({
+        users.update_one({
             "Username":username
         }, {
             "$set":{
@@ -167,11 +260,57 @@ class Refill(Resource):
         }
         return jsonify(retJson)
 
+class Summarize(Resource):
+    def post(self):
+        posted_data=request.get_json()
+        username=posted_data["username"]
+        password=posted_data["password"]
+        document_path=posted_data["path"]
+        number_of_sentences=int(posted_data["sentences"])
+        # verify username
+        if not UserExist(username):
+            retJson={"status":301,
+            "msg":"Invalid Username"
+            }
+            return jsonify(retJson)
+        # verify password
+        correct_pw=verifyPw(username,password)
+        
+        if not correct_pw:
+            retJson={"status":302,
+                     "msg":"Incorrect Password"
+                     }
+            return jsonify(retJson)
+        # verify user has enough tokens
+        num_tokens=countTokens(username)
+        if int(num_tokens<=0):
+            retJson={"status":303,
+                     "msg":"You are out of tokens"
+                     }
+            return jsonify(retJson)
+        
+        # summarize the text finally
+        text,summarized_text=summarize_text(document_path,number_of_sentences)
+        if text=="" and summarized_text=="":
+            retJson={"status":304,
+                     "msg":"File not found"
+                     }
+            return jsonify(retJson)
+        elif len(summarized_text)==0 and len(text)>0:
+            retJson={"status":305,
+                     "msg":"Please provide sufficient number to summarize text"
+                     }
+            return jsonify(retJson)
+        retJson={"text":text,
+                 "summarized_text":summarized_text
+                 }
+        return retJson
+        return jsonify(retJson)
 
 api.add_resource(Register, '/register')
 api.add_resource(Detect, '/detect')
 api.add_resource(Refill, '/refill')
-
+api.add_resource(Summarize,'/summarize')
 
 if __name__=="__main__":
     app.run(host='0.0.0.0')
