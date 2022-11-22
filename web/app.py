@@ -9,7 +9,7 @@ import spacy
 nlp = spacy.load('en_core_web_sm')
 
 # ------------------------------------------
-# summarization depecdancies
+# summarization dependancies
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize,word_tokenize
 import heapq
@@ -281,11 +281,7 @@ class Grammer_Check(Resource):
         })
 
         return retJson 
-        # printing matches  
         
-
-
-
 class Refill(Resource):
     def post(self):
         postedData = request.get_json()
