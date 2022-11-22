@@ -2,6 +2,11 @@ from flask import Flask, jsonify, request
 from flask_restful import Api, Resource
 from pymongo import MongoClient
 import bcrypt
+import language_tool_python
+# using the tool  
+my_tool = language_tool_python.LanguageTool('en-US')  
+import spacy
+nlp = spacy.load('en_core_web_sm')
 
 app = Flask(__name__)
 api = Api(app)
@@ -68,7 +73,7 @@ def countTokens(username):
     })[0]["Tokens"]
     return tokens
 
-class Detect(Resource):
+class Similarity(Resource):
     def post(self):
         #Step 1 get the posted data
         postedData = request.get_json()
@@ -103,9 +108,7 @@ class Detect(Resource):
             }
             return jsonify(retJson)
 
-        #Calculate edit distance between text1, text2
-        import spacy
-        nlp = spacy.load('en_core_web_sm')
+        #Calculate edit distance between text1, text2        
         text1 = nlp(text1)
         text2 = nlp(text2)
 
@@ -128,6 +131,64 @@ class Detect(Resource):
         })
 
         return jsonify(retJson)
+
+class Grammer_Check(Resource):
+    def post(self):
+        #Step 1 get the posted data
+        postedData = request.get_json()
+        #Step 2 is to read the data
+        username = postedData["username"]
+        password = postedData["password"]
+        text = postedData["text"]
+        if not UserExist(username):
+            retJson = {
+                'status':301,
+                'msg': "Invalid Username"
+            }
+            return jsonify(retJson)
+        #Step 3 verify the username pw match
+        correct_pw = verifyPw(username, password)
+
+        if not correct_pw:
+            retJson = {
+                "status":302,
+                "msg": "Incorrect Password"
+            }
+            return jsonify(retJson)
+        #Step 4 Verify user has enough tokens
+        num_tokens = countTokens(username)
+        if int(num_tokens) <= 0:
+            retJson = {
+                "status": 303,
+                "msg": "You are out of tokens, please refill!"
+            }
+            return jsonify(retJson)
+        
+        # correction  
+        correct_text = my_tool.correct(text)  
+
+        retJson = {
+            "status":200,
+            "msg":"Text Corrected Successfully !!",
+            "Original Text": text,
+            "Text after correction": correct_text
+        }
+
+        #Take away 1 token from user
+        current_tokens = countTokens(username)
+        users.update({
+            "Username":username
+        }, {
+            "$set":{
+                "Tokens":int(current_tokens)-1
+                }
+        })
+
+        return retJson 
+        # printing matches  
+        
+
+
 
 class Refill(Resource):
     def post(self):
@@ -169,7 +230,8 @@ class Refill(Resource):
 
 
 api.add_resource(Register, '/register')
-api.add_resource(Detect, '/detect')
+api.add_resource(Similarity, '/similarity')
+api.add_resource(Grammer_Check,'/grammer_check')
 api.add_resource(Refill, '/refill')
 
 
