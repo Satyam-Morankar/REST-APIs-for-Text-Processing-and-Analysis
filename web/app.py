@@ -46,7 +46,7 @@ class Register(Resource):
 
         retJson = {
             "status": 200,
-            "msg": "You successfully signed up for the API"
+            "msg": "You have successfully signed up for the API"
         }
         return jsonify(retJson)
 def verifyPw(username, password):
@@ -96,7 +96,7 @@ class Detect(Resource):
             return jsonify(retJson)
         #Step 4 Verify user has enough tokens
         num_tokens = countTokens(username)
-        if num_tokens <= 0:
+        if int(num_tokens) <= 0:
             retJson = {
                 "status": 303,
                 "msg": "You are out of tokens, please refill!"
@@ -123,7 +123,7 @@ class Detect(Resource):
             "Username":username
         }, {
             "$set":{
-                "Tokens":current_tokens-1
+                "Tokens":int(current_tokens)-1
                 }
         })
 
