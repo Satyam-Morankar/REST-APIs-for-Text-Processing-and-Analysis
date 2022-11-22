@@ -149,6 +149,9 @@ def summarize_text(filename,no_of_sentences,print_summarized_text=False):
         print('-'*80)
     return data,summarized_text
 
+def calculate_reading_time(text,wpm=120):
+    tokens=nltk.word_tokenize(text)
+    return len(tokens)/wpm
 
 class Detect(Resource):
     def post(self):
@@ -304,13 +307,67 @@ class Summarize(Resource):
         retJson={"text":text,
                  "summarized_text":summarized_text
                  }
-        return retJson
+        #Take away 1 token from user
+        current_tokens = countTokens(username)
+        users.update_one({
+            "Username":username
+        }, {
+            "$set":{
+                "Tokens":int(current_tokens)-1
+                }
+        })
         return jsonify(retJson)
 
+class ReadingTime(Resource):
+    def post(self):
+        posted_data=request.get_json()
+        username=posted_data["username"]
+        password=posted_data["password"]
+        document_path=posted_data["path"]
+        document_path=base_path+"\\documents"+"\\"+document_path
+        wpm=posted_data["wpm"]
+        if wpm=="":
+            wpm=120
+        wpm=int(wpm)
+        
+        # verify username
+        if not UserExist(username):
+            retJson={"status":301,
+            "msg":"Invalid Username"
+            }
+            return jsonify(retJson)
+        # verify password
+        correct_pw=verifyPw(username,password)
+        
+        if not correct_pw:
+            retJson={"status":302,
+                     "msg":"Incorrect Password"
+                     }
+            return jsonify(retJson)
+        # verify user has enough tokens
+        num_tokens=countTokens(username)
+        if int(num_tokens<=0):
+            retJson={"status":303,
+                     "msg":"You are out of tokens"
+                     }
+            return jsonify(retJson)
+        # calculate reading time finally
+        try:
+            with open(document_path) as file:
+                text=file.read()
+        except:
+            retJson={"status":304,
+                     "msg":"File not found"}
+            return jsonify(retJson)
+        reading_time=calculate_reading_time(text,wpm)
+        retJson={"reading time (minutes)":reading_time}
+        return jsonify(retJson)
+    
 api.add_resource(Register, '/register')
 api.add_resource(Detect, '/detect')
 api.add_resource(Refill, '/refill')
 api.add_resource(Summarize,'/summarize')
+api.add_resource(ReadingTime,'/readingtime')
 
 if __name__=="__main__":
     app.run(host='0.0.0.0')
