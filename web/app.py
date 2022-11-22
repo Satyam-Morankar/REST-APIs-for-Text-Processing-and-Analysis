@@ -275,7 +275,7 @@ class Grammer_Check(Resource):
 
         #Take away 1 token from user
         current_tokens = countTokens(username)
-        users.update({
+        users.update_one({
             "Username":username
         }, {
             "$set":{
