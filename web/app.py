@@ -325,10 +325,10 @@ class ReadingTime(Resource):
         password=posted_data["password"]
         document_path=posted_data["path"]
         document_path=base_path+"\\documents"+"\\"+document_path
-        wpm=posted_data["wpm"]
-        if wpm=="":
+        try:
+            wpm=posted_data["wpm"]
+        except:
             wpm=120
-        wpm=int(wpm)
         
         # verify username
         if not UserExist(username):
