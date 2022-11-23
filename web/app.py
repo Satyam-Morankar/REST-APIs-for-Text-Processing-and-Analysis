@@ -14,6 +14,15 @@ import requests
 # using the tool
 my_tool = language_tool_python.LanguageTool('en-US')
 nlp = spacy.load('en_core_web_sm')
+import pyttsx3
+
+audio_number=1
+
+bot=pyttsx3.init()
+voices=bot.getProperty('voices')
+bot.setProperty('rate',125)
+bot.setProperty('voice',voices[1].id)
+bot.setProperty('volume',1)
 
 # ------------------------------------------
 # summarization depecdancies
@@ -349,7 +358,18 @@ class Summarize(Resource):
         username = posted_data["username"]
         password = posted_data["password"]
         document_path = posted_data["path"]
-        number_of_sentences = int(posted_data["sentences"])
+        try:
+            number_of_sentences = int(posted_data["sentences"])
+        except:
+            number_of_sentences=5
+        try:
+            speak_text=posted_data["speak"]
+        except:
+            speak_text="False"
+        try:
+            save_audio=posted_data["save_audio"]
+        except:
+            save_audio="False"
         # verify username
         if not UserExist(username):
             retJson = {"status": 301,
@@ -397,6 +417,13 @@ class Summarize(Resource):
                 "Tokens": int(current_tokens)-1
             }
         })
+        if save_audio=="True":
+            bot.save_to_file(summarized_text,base_path+"\\audio\\"+str(audio_number)+".mp3")
+            audio_number+=1
+            
+        if speak_text=="True":
+            bot.say(summarized_text)
+            bot.runAndWait()
         return jsonify(retJson)
 
 
@@ -499,6 +526,8 @@ class Summarize_Similarity(Resource):
                      }
             return jsonify(retJson)
         return (response.json())
+    
+    
 api.add_resource(Register, '/register')
 api.add_resource(Similarity, '/similarity')
 api.add_resource(Grammer_Check, '/grammer_check')
@@ -508,4 +537,6 @@ api.add_resource(ReadingTime, '/readingtime')
 api.add_resource(Summarize_Similarity,'/summarize_similarity')
 
 if __name__ == "__main__":
+    bot.say('Server booted')
+    bot.runAndWait()
     app.run(host='0.0.0.0')
