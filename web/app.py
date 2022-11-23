@@ -10,6 +10,7 @@ from flask_restful import Api, Resource
 from pymongo import MongoClient
 import bcrypt
 import language_tool_python
+import requests
 # using the tool
 my_tool = language_tool_python.LanguageTool('en-US')
 nlp = spacy.load('en_core_web_sm')
@@ -376,7 +377,7 @@ class Summarize(Resource):
                        "msg": "Please provide sufficient number to summarize text"
                        }
             return jsonify(retJson)
-        retJson = {"text": text,
+        retJson = {"original_text": text,
                    "summarized_text": summarized_text
                    }
         # Take away 1 token from user
@@ -436,13 +437,62 @@ class ReadingTime(Resource):
         retJson = {"reading time (minutes)": reading_time}
         return jsonify(retJson)
 
+class Summarize_Similarity(Resource):
+    def post(self):
+        posted_data=request.get_json()
+        username=posted_data["username"]
+        password=posted_data["password"]
+        file1name=posted_data["path1"]
+        file2name=posted_data["path2"]
+        try:
+            no_of_sentences=int(posted_data["sentences"])
+        except:
+            no_of_sentences=5
+        # path1=base_path+"\\documents"+"\\"+path1
+        # path2=base_path+"\\documents"+"\\"+path2
+        
+        # verify username
+        if not UserExist(username):
+            retJson = {"status": 301,
+                       "msg": "Invalid Username"
+                       }
+            return jsonify(retJson)
+        # verify password
+        correct_pw = verifyPw(username, password)
 
+        if not correct_pw:
+            retJson = {"status": 302,
+                       "msg": "Incorrect Password"
+                       }
+            return jsonify(retJson)
+        # verify user has enough tokens
+        num_tokens = countTokens(username)
+        if int(num_tokens <= 0):
+            retJson = {"status": 303,
+                       "msg": "You are out of tokens"
+                       }
+            return jsonify(retJson)
+        # summarize both the texts
+        text1,summarized_text1=summarize_text(file1name,no_of_sentences)
+        text2,summarized_text2=summarize_text(file2name,no_of_sentences)
+        json_body={"username":username,
+                   "password":password,
+                   "path1":file1name,
+                   "path2":file2name}
+        response = requests.post('http://localhost:5000/similarity',json=json_body)
+        if response.status_code !=200:
+            retJson={"status":response.status_code,
+                     "msg":"Error"
+                     }
+            return jsonify(retJson)
+        return (response.json())
 api.add_resource(Register, '/register')
 api.add_resource(Similarity, '/similarity')
 api.add_resource(Grammer_Check, '/grammer_check')
 api.add_resource(Refill, '/refill')
 api.add_resource(Summarize, '/summarize')
 api.add_resource(ReadingTime, '/readingtime')
+api.add_resource(Summarize_Similarity,'/summarize_similarity')
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0')
