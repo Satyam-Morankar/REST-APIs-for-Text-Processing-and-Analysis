@@ -343,7 +343,7 @@ class Summarize(Resource):
             return jsonify(retJson)
         # verify user has enough tokens
         num_tokens=countTokens(username)
-        if int(num_tokens<=0):
+        if int(num_tokens)<=0:
             retJson={"status":303,
                      "msg":"You are out of tokens"
                      }
@@ -361,7 +361,7 @@ class Summarize(Resource):
                      "msg":"Please provide sufficient number to summarize text"
                      }
             return jsonify(retJson)
-        retJson={"text":text,
+        retJson={"Original_text":text,
                  "summarized_text":summarized_text
                  }
         #Take away 1 token from user
