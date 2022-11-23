@@ -17,6 +17,12 @@ nlp = spacy.load('en_core_web_sm')
 
 # ------------------------------------------
 # summarization depecdancies
+from nltk.corpus import stopwords
+from nltk.tokenize import sent_tokenize,word_tokenize
+import heapq
+import nltk
+import re
+import os
 # ------------------------------------------
 
 app = Flask(__name__)
@@ -292,8 +298,10 @@ class Grammer_Check(Resource):
             }
         })
 
-        return retJson
-        # printing matches
+        return retJson 
+        # printing matches  
+        
+
 
 
 class Refill(Resource):
@@ -357,11 +365,11 @@ class Summarize(Resource):
                        }
             return jsonify(retJson)
         # verify user has enough tokens
-        num_tokens = countTokens(username)
-        if int(num_tokens) <= 0:
-            retJson = {"status": 303,
-                       "msg": "You are out of tokens"
-                       }
+        num_tokens=countTokens(username)
+        if int(num_tokens<=0):
+            retJson={"status":303,
+                     "msg":"You are out of tokens"
+                     }
             return jsonify(retJson)
 
         # summarize the text finally
@@ -377,10 +385,10 @@ class Summarize(Resource):
                        "msg": "Please provide sufficient number to summarize text"
                        }
             return jsonify(retJson)
-        retJson = {"original_text": text,
-                   "summarized_text": summarized_text
-                   }
-        # Take away 1 token from user
+        retJson={"text":text,
+                 "summarized_text":summarized_text
+                 }
+        #Take away 1 token from user
         current_tokens = countTokens(username)
         users.update_one({
             "Username": username
@@ -448,8 +456,6 @@ class Summarize_Similarity(Resource):
             no_of_sentences=int(posted_data["sentences"])
         except:
             no_of_sentences=5
-        # path1=base_path+"\\documents"+"\\"+path1
-        # path2=base_path+"\\documents"+"\\"+path2
         
         # verify username
         if not UserExist(username):
@@ -475,10 +481,17 @@ class Summarize_Similarity(Resource):
         # summarize both the texts
         text1,summarized_text1=summarize_text(file1name,no_of_sentences)
         text2,summarized_text2=summarize_text(file2name,no_of_sentences)
+        with open(base_path+"\\documents"+"\\summary1.txt","w") as file:
+            file.write(summarized_text1)
+        with open(base_path+"\\documents"+"\\summary2.txt","w") as file:
+            file.write(summarized_text2)
+        path1="summary1.txt"
+        path2="summary2.txt"
         json_body={"username":username,
                    "password":password,
-                   "path1":file1name,
-                   "path2":file2name}
+                   "path1":path1,
+                   "path2":path2
+                   }
         response = requests.post('http://localhost:5000/similarity',json=json_body)
         if response.status_code !=200:
             retJson={"status":response.status_code,
