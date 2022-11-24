@@ -9,10 +9,19 @@ from flask import Flask, jsonify, request
 from flask_restful import Api, Resource
 from pymongo import MongoClient
 import bcrypt
+#-------------------------------------------------------
+# Grammar check dependencies
 import language_tool_python
 import requests
 # using the tool
 my_tool = language_tool_python.LanguageTool('en-US')
+# -------------------------------------------------------------
+# paraphrase dependencies
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+tokenizer = AutoTokenizer.from_pretrained("Vamsi/T5_Paraphrase_Paws")
+model = AutoModelForSeq2SeqLM.from_pretrained("Vamsi/T5_Paraphrase_Paws")
+# --------------------------------------------------------------
+# Similarity check dependencies
 nlp = spacy.load('en_core_web_sm')
 import pyttsx3
 
@@ -307,6 +316,83 @@ class Grammer_Check(Resource):
         })
 
         return retJson 
+
+class Paraphrase(Resource):
+    def post(self):
+        postedData = request.get_json()
+
+        username = postedData["username"]
+        password = postedData["password"]
+        document_path= postedData["path"]
+        document_path= base_path+"\\documents"+"\\"+document_path
+
+        try:
+            with open(document_path) as file:
+                text=file.read()
+            
+            #pass
+        except:
+            retJson={"status":404,
+                     "msg":"File not found"
+                     }
+            return retJson
+
+        if not UserExist(username):
+            retJson = {
+                'status':301,
+                'msg': "Invalid Username"
+            }
+            return jsonify(retJson)
+        #Step 3 verify the username pw match
+        correct_pw = verifyPw(username, password)
+
+        if not correct_pw:
+            retJson = {
+                "status":302,
+                "msg": "Incorrect Password"
+            }
+            return jsonify(retJson)
+        #Step 4 Verify user has enough tokens
+        num_tokens = countTokens(username)
+        if int(num_tokens) <= 0:
+            retJson = {
+                "status": 303,
+                "msg": "You are out of tokens, please refill!"
+            }
+            return jsonify(retJson)
+
+        # Step 5: Paraphrase the text:
+        def my_paraphrase(sentence):
+            sentence = "paraphrase: "+ sentence+" </s>"
+            encoding = tokenizer.encode_plus(sentence,padding=True, return_tensors="pt")
+            input_ids,attention_masks = encoding["input_ids"],encoding["attention_mask"]
+
+            outputs = model.generate(
+                input_ids = input_ids, attention_mask=attention_masks,
+                max_length = 256,
+                do_sample = True,
+                top_k=120,
+                top_p=0.95,
+                early_stopping=True,
+                num_return_sequences=1
+            )
+            output = tokenizer.decode(outputs[0],skip_special_tokens=True,clean_up_tokenization_spaces=True)
+
+            return(output)
+
+        # join the paraphrased sentences:
+
+        output = " ".join([my_paraphrase(sent) for sent in sent_tokenize(text)])
+
+        # Return json response:
+
+        retJson = {
+            "status":200,
+            "msg":"The input text is Pharaphrased Successfully !!",
+            "Original Text": text,
+            "Pharaphrased Text": output
+        }    
+        return retJson   
         # printing matches  
         
 
@@ -536,6 +622,7 @@ api.add_resource(Refill, '/refill')
 api.add_resource(Summarize, '/summarize')
 api.add_resource(ReadingTime, '/readingtime')
 api.add_resource(Summarize_Similarity,'/summarize_similarity')
+api.add_resource(Paraphrase, '/paraphrase')
 
 if __name__ == "__main__":
     bot.say('Server booted')
