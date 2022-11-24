@@ -16,7 +16,6 @@ my_tool = language_tool_python.LanguageTool('en-US')
 nlp = spacy.load('en_core_web_sm')
 import pyttsx3
 
-audio_number=1
 
 bot=pyttsx3.init()
 voices=bot.getProperty('voices')
@@ -418,12 +417,14 @@ class Summarize(Resource):
             }
         })
         if save_audio=="True":
-            bot.save_to_file(summarized_text,base_path+"\\audio\\"+str(audio_number)+".mp3")
-            audio_number+=1
-            
-        if speak_text=="True":
-            bot.say(summarized_text)
+            try:
+                os.remove(base_path+"\\audio\\"+"audio.mp3")
+            except:
+                pass
+            bot.save_to_file(summarized_text,base_path+"\\audio\\"+"audio.mp3")
             bot.runAndWait()
+        if speak_text=="True":
+            os.startfile(base_path+"\\audio\\"+"audio.mp3","open")
         return jsonify(retJson)
 
 
