@@ -24,8 +24,6 @@ model = AutoModelForSeq2SeqLM.from_pretrained("Vamsi/T5_Paraphrase_Paws")
 # Similarity check dependencies
 nlp = spacy.load('en_core_web_sm')
 import pyttsx3
-
-
 bot=pyttsx3.init()
 voices=bot.getProperty('voices')
 bot.setProperty('rate',125)
@@ -471,7 +469,7 @@ class Summarize(Resource):
             return jsonify(retJson)
         # verify user has enough tokens
         num_tokens=countTokens(username)
-        if int(num_tokens<=0):
+        if int(num_tokens)<=0:
             retJson={"status":303,
                      "msg":"You are out of tokens"
                      }
@@ -542,7 +540,7 @@ class ReadingTime(Resource):
             return jsonify(retJson)
         # verify user has enough tokens
         num_tokens = countTokens(username)
-        if int(num_tokens <= 0):
+        if int(num_tokens) <= 0:
             retJson = {"status": 303,
                        "msg": "You are out of tokens"
                        }
@@ -587,7 +585,7 @@ class Summarize_Similarity(Resource):
             return jsonify(retJson)
         # verify user has enough tokens
         num_tokens = countTokens(username)
-        if int(num_tokens <= 0):
+        if int(num_tokens) <= 0:
             retJson = {"status": 303,
                        "msg": "You are out of tokens"
                        }
